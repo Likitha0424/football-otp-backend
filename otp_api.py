@@ -2,23 +2,29 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from random import randint
-import smtplib
-from email.mime.text import MIMEText
 from datetime import datetime, timedelta
-
-from sqlalchemy import create_engine, Column, String, Integer, DateTime
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+from sqlalchemy import create_engine, Column, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
+import os
 
-# === DB Setup ===
-DATABASE_URL = "sqlite:///./otp.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# Load environment variables
+load_dotenv()
+
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+SENDGRID_FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# === Database setup ===
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
 class OTPRecord(Base):
     __tablename__ = "otp"
-
     player_id = Column(String, primary_key=True, index=True)
     email = Column(String)
     otp = Column(String)
@@ -26,16 +32,10 @@ class OTPRecord(Base):
 
 Base.metadata.create_all(bind=engine)
 
-# === FastAPI ===
+# === FastAPI App ===
 app = FastAPI()
 
-# === Email Setup ===
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-EMAIL_FROM = "likithap2404@gmail.com"
-EMAIL_PASSWORD = "ztvaarqtqpvyqqjf"  # <- your latest 16-char app password (no spaces)
-
-# === Pydantic Schemas ===
+# === Pydantic Models ===
 class OTPRequest(BaseModel):
     email: EmailStr
 
@@ -43,25 +43,21 @@ class OTPValidate(BaseModel):
     email: EmailStr
     otp: str
 
-# === Helper: Send OTP ===
+# === Email Sender ===
 def send_otp_email(email: str, otp: str):
-    subject = "Your One-Time Password (OTP)"
-    body = f"Your OTP is: {otp}\nIt is valid for 5 minutes.\n\n- Football App"
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = EMAIL_FROM
-    msg["To"] = email
-
+    message = Mail(
+        from_email=SENDGRID_FROM_EMAIL,
+        to_emails=email,
+        subject="Your One-Time Password (OTP)",
+        plain_text_content=f"Your OTP is: {otp}\nIt is valid for 5 minutes.\n\n- Football App"
+    )
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(EMAIL_FROM, EMAIL_PASSWORD)
-        server.sendmail(EMAIL_FROM, email, msg.as_string())
-        server.quit()
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        sg.send(message)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send email: {e}")
+        raise HTTPException(status_code=500, detail=f"Email send failed: {e}")
 
-# === POST /otp: Generate and store OTP ===
+# === POST: Generate OTP ===
 @app.post("/v1/player/{player_id}/otp")
 def generate_otp(player_id: str, req: OTPRequest):
     otp = f"{randint(100000, 999999)}"
@@ -76,7 +72,7 @@ def generate_otp(player_id: str, req: OTPRequest):
     send_otp_email(req.email, otp)
     return {"message": "OTP sent to email."}
 
-# === POST /validate ===
+# === POST: Validate OTP ===
 @app.post("/v1/player/{player_id}/otp/validate")
 def validate_otp(player_id: str, req: OTPValidate):
     db = SessionLocal()
@@ -84,17 +80,15 @@ def validate_otp(player_id: str, req: OTPValidate):
     db.close()
 
     if not record:
-        raise HTTPException(status_code=404, detail="No OTP found.")
-
+        raise HTTPException(status_code=404, detail="OTP not found.")
     if record.email != req.email or record.otp != req.otp:
         raise HTTPException(status_code=400, detail="Invalid OTP or email.")
-
     if datetime.utcnow() > record.expires_at:
         raise HTTPException(status_code=400, detail="OTP expired.")
 
     return {"message": "OTP validated successfully."}
 
-# === GET /otp: View OTP record (for testing only) ===
+# === GET: View OTP (for testing only) ===
 @app.get("/v1/player/{player_id}/otp")
 def get_otp(player_id: str):
     db = SessionLocal()

@@ -1,38 +1,38 @@
-# 🔐 OTP Authentication API – Football App
+# ⚽ Football App - OTP Backend API (FastAPI + PostgreSQL + SendGrid)
 
-This is a backend service built with **FastAPI** for generating and validating **One-Time Passwords (OTP)** via email. It's designed for secure player onboarding in a football training app.
-
----
-
-## ✅ Features
-
-- 🔹 Generate OTP and send it to player's email
-- 🔹 Store OTP in SQLite database with 5-minute expiry
-- 🔹 Validate OTP submitted by the user
-- 🔹 Optional: View OTP details for testing
-- 🔹 Email is sent securely using Gmail's App Password system
+This backend service handles OTP (One-Time Password) generation, email delivery, and validation for player registration and login within a football training app.
 
 ---
 
-## 🚀 Technologies Used
+## 🚀 Features
 
-| Component        | Tech           |
-|------------------|----------------|
-| Framework        | FastAPI        |
-| Database         | SQLite + SQLAlchemy |
-| Email Service    | Gmail (SMTP)   |
-| Language         | Python 3.10+   |
-| API Docs         | Swagger UI     |
+- Player registration with email
+- OTP generation with 5-minute expiry
+- Email delivery via SendGrid API
+- OTP validation flow
+- PostgreSQL database integration
+- REST API built with FastAPI
 
 ---
 
-## 📂 Project Structure
+## 🛠 Tech Stack
+
+- FastAPI
+- SQLAlchemy
+- PostgreSQL
+- SendGrid (email service)
+- Python 3.10+
+
+---
+
+## 📁 Project Structure
 
 otp_generation/
+│
 ├── otp_api.py # Main FastAPI app
-├── otp.db # SQLite database storing OTPs
-├── requirements.txt # Project dependencies
-└── README.md # Project info
+├── .env # Environment variables
+├── requirements.txt # Python dependencies
+├── README.md # Project documentation
 
 yaml
 Copy
@@ -40,71 +40,53 @@ Edit
 
 ---
 
-## ⚙️ Setup & Run
+## ⚙️ Setup Instructions
 
-### 1️⃣ Clone the Repo
+### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/otp-auth-api.git
-cd otp-auth-api
-2️⃣ Create a Virtual Environment
+git clone https://github.com/Likitha0424/football-otp-backend.git
+cd football-otp-backend
+2. Create & Activate Virtual Environment
 bash
 Copy
 Edit
 conda create -n football python=3.10 -y
 conda activate football
-3️⃣ Install Dependencies
+3. Create .env File
+Create a .env file in the root folder and add:
+
+ini
+Copy
+Edit
+
+4. Install Dependencies
 bash
 Copy
 Edit
 pip install -r requirements.txt
-4️⃣ Configure Gmail App Password
-You need to set your own Gmail and App Password:
-
-python
-Copy
-Edit
-# In otp_api.py
-EMAIL_FROM = "your_email@gmail.com"
-EMAIL_PASSWORD = "your_16_char_app_password"
-5️⃣ Run the FastAPI Server
+5. Run the FastAPI App
 bash
 Copy
 Edit
 uvicorn otp_api:app --reload
-Swagger UI: http://127.0.0.1:8000/docs
-
-📬 API Endpoints
+📡 API Endpoints
 Method	Endpoint	Description
-POST	/v1/player/{player_id}/otp	Generate & email OTP
-POST	/v1/player/{player_id}/otp/validate	Validate submitted OTP
-GET	/v1/player/{player_id}/otp	View OTP (for testing)
+POST	/v1/player/register	Register a new player
+POST	/v1/player/{playerId}/otp	Generate and send OTP to email
+GET	/v1/player/{playerId}/otp	Retrieve OTP info
+POST	/v1/player/{playerId}/otp/validate	Validate player OTP
 
-🧪 Sample JSON
-📤 Generate OTP
-json
-Copy
-Edit
-POST /v1/player/123/otp
-{
-  "email": "player@example.com"
-}
-✅ Validate OTP
-json
-Copy
-Edit
-POST /v1/player/123/otp/validate
-{
-  "email": "player@example.com",
-  "otp": "123456"
-}
-📌 Notes
-OTPs expire in 5 minutes.
+✅ Flow Summary
+Player registers using email
 
-OTPs are sent using SMTP Gmail.
+OTP is generated and emailed
 
-Emails must be valid to receive OTP.
+Player enters OTP on frontend
 
-📃 License
-MIT License © 2025
+OTP is validated via /validate
 
+On success, player is marked active
+
+👩‍💻 Author
+Likitha0424 – GitHub Profile
