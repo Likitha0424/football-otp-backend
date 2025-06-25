@@ -5,7 +5,7 @@ from random import randint
 from datetime import datetime, timedelta
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
-from sqlalchemy import create_engine, Column, String, DateTime
+from sqlalchemy import create_engine, Column, String, DateTime, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
@@ -29,6 +29,7 @@ class OTPRecord(Base):
     email = Column(String)
     otp = Column(String)
     expires_at = Column(DateTime)
+    retry_count = Column(Integer, default=0)  # NEW
 
 Base.metadata.create_all(bind=engine)
 
@@ -64,8 +65,16 @@ def generate_otp(player_id: str, req: OTPRequest):
     expiry = datetime.utcnow() + timedelta(minutes=5)
 
     db = SessionLocal()
+    # Clear previous OTP (if any)
     db.query(OTPRecord).filter(OTPRecord.player_id == player_id).delete()
-    db.add(OTPRecord(player_id=player_id, email=req.email, otp=otp, expires_at=expiry))
+    # Create new OTP with retry_count = 0
+    db.add(OTPRecord(
+        player_id=player_id,
+        email=req.email,
+        otp=otp,
+        expires_at=expiry,
+        retry_count=0
+    ))
     db.commit()
     db.close()
 
@@ -77,14 +86,29 @@ def generate_otp(player_id: str, req: OTPRequest):
 def validate_otp(player_id: str, req: OTPValidate):
     db = SessionLocal()
     record = db.query(OTPRecord).filter(OTPRecord.player_id == player_id).first()
-    db.close()
 
     if not record:
+        db.close()
         raise HTTPException(status_code=404, detail="OTP not found.")
+
+    if record.retry_count >= 3:
+        db.close()
+        raise HTTPException(status_code=403, detail="Maximum OTP attempts exceeded.")
+
     if record.email != req.email or record.otp != req.otp:
-        raise HTTPException(status_code=400, detail="Invalid OTP or email.")
+        record.retry_count += 1
+        db.commit()
+        db.close()
+        raise HTTPException(status_code=401, detail="OTP did not match.")
+
     if datetime.utcnow() > record.expires_at:
+        db.close()
         raise HTTPException(status_code=400, detail="OTP expired.")
+
+    # Reset retry count on success
+    record.retry_count = 0
+    db.commit()
+    db.close()
 
     return {"message": "OTP validated successfully."}
 
@@ -101,5 +125,6 @@ def get_otp(player_id: str):
     return {
         "email": record.email,
         "otp": record.otp,
-        "expires_at": record.expires_at.isoformat()
+        "expires_at": record.expires_at.isoformat(),
+        "retry_count": record.retry_count
     }
