@@ -34,9 +34,7 @@ otp_generation/
 ├── requirements.txt # Python dependencies
 ├── README.md # Project documentation
 
-yaml
-Copy
-Edit
+
 
 ---
 
@@ -49,26 +47,22 @@ git clone https://github.com/Likitha0424/football-otp-backend.git
 cd football-otp-backend
 2. Create & Activate Virtual Environment
 bash
-Copy
-Edit
+
 conda create -n football python=3.10 -y
 conda activate football
 3. Create .env File
 Create a .env file in the root folder and add:
 
 ini
-Copy
-Edit
+
 
 4. Install Dependencies
 bash
-Copy
-Edit
+
 pip install -r requirements.txt
 5. Run the FastAPI App
 bash
-Copy
-Edit
+
 uvicorn otp_api:app --reload
 📡 API Endpoints
 Method	Endpoint	Description
